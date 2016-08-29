@@ -1,75 +1,3 @@
-#####################
-annotatePeaks<-function(peaks,genedb="~/amber3/no_back_up/data/R_data/human.gencodeV19",peak.type="BED",by_gene=TRUE,min.distance=2000,pro.len=500,pro=TRUE,subchr=FALSE,head=FALSE){
-library(GenomicFeatures)
-library(bumphunter)
-library(hash)
-
-if(peak.type=="BED"){
-	if(head==TRUE){
-		read.table(peaks,header=T)->peak
-	}
-	else{
-		read.table(peaks)->peak
-	}
-	if(subchr==TRUE){
-		GRanges(seqname=sub("chr","",peak[,1]),range=IRanges(start=peak[,2],end=peak[,3]))->peak.range
-	}
-	else{
-		GRanges(seqname=peak[,1],range=IRanges(start=peak[,2],end=peak[,3]))->peak.range
-	}
-}
-else if(peak.type=="RANGE"){
-peaks->peak.range
-}
-
-
-names(peak.range)<-1:length(peak.range)
-
-loadDb(genedb)->db
-if(by_gene==TRUE){
-genes(db)->gene
-}
-else{
-transcriptsBy(db,by="gene")->gene
-unlist(gene)->gene
-}
-
-annotateNearest(peak.range,gene)->anno
-anno$peak_id<-as.numeric(names(peak.range))
-abs(anno$dist)<=min.distance -> ind
-anno[ind,]->anno
-names(gene)[anno$subjectHits]->anno$gene
-
-if(pro==TRUE){
-if(by_gene==TRUE){
-promoters(gene, upstream=pro.len, downstream=pro.len)->pro
-}
-else{
-promoters(db, upstream=pro.len, downstream=pro.len)->pro
-}
-if(by_gene==TRUE){
-hash(keys=mcols(gene)$gene_id,values=names(gene))->table
-values(table,mcols(pro)$gene_id)->names(pro)
-}
-else{
-hash(keys=mcols(gene)$tx_name,values=names(gene))->table
-values(table,mcols(pro)$tx_name)->names(pro)
-}
-
-annotateNearest(peak.range,pro)->anno.pro
-anno.pro$peak_id<-as.numeric(names(peak.range))
-abs(anno.pro$dist)==0 & !is.na(anno.pro$dist)-> ind
-anno.pro[ind,]->anno.pro
-names(pro)[anno.pro$subjectHits]->anno.pro$gene
-list(all=anno,promoter=anno.pro)->out
-}
-else{
-list(all=anno)->out
-}
-return(out)
-}
-
-
 #####################################
 annotatePeaksfromgff<-function(peaks,genedb,min.distance=2000,pro=TRUE,subchr=TRUE,header=FALSE){
 if(header==TRUE){read.table(peaks,header=T)->peak}else{read.table(peaks)->peak}
@@ -285,33 +213,6 @@ dist<-sum(width(intersect(block1,block2)))/sum(width(union(block1,block2)))
 dist
 }
 
-#####################################
-
-merge_peaks<-function(peak=peakfile,min.dis=10000,remove.small=NULL,remove.small0=0,return.range=FALSE){
-######### first remove region less than remove.small0
-library(GenomicFeatures)
-read.table(peak)->x
-GRanges(seqnames=x[,1],range=IRanges(start=x[,2],end=x[,3]))->y
-width(y)>=remove.small0 ->ind
-y[ind]->y
-gaps(y)->gap
-width(gap)< min.dis ->ind
-reduce(c(y,gap[ind]))->z
-
-######### after merge by mis.dis, remove merged region less than remove.small
-if(!is.null(remove.small)){
-width(z)>=remove.small -> ind
-z[ind]->z
-}
-if(return.range==FALSE){
-data.frame(chr=as.vector(seqnames(z)),start=start(z),end=end(z))->out
-return(out)
-}
-else{
-return(z)
-}
-
-}
 
 #####################################
 
